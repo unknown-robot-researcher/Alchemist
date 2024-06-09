@@ -8,7 +8,7 @@ import speech_recognition as sr
 import whisper
 import torch
 import threading
-import rospy
+import rclpy
 from std_msgs.msg import String
 
 from datetime import datetime, timedelta
@@ -239,7 +239,8 @@ class whisper_speech():
 if __name__ == "__main__":
 
     WS = whisper_speech()
-    rospy.init_node('whisper_transcriber')
-    pub = rospy.Publisher('speech_text', String, queue_size=10)
-    rospy.Subscriber("/whisper", String, WS.main)
-    rospy.spin()
+    rclpy.init()
+    node = rclpy.create_node("whisper_transcriber")
+    pub = node.create_publisher(String, 'speech_text', 10)
+    node.create_subscription(String, '/whisper',  WS.main, rclpy.qos.QoSProfile())
+    rclpy.spin()

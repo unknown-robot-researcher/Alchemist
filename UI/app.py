@@ -6,7 +6,7 @@ from PyQt5.QtPrintSupport import *
 from UI.rviz_widget.myviz import MyViz
 import os, time
 import sys
-import rospy
+import rclpy
 from std_msgs.msg import String 
 from std_msgs.msg import Bool 
 from UI.codeEditor.higlight import PythonHighlighter
@@ -43,7 +43,6 @@ def run_gpt_code(num):
 			result = subprocess.check_output(["python","./LLM/gpt_code.py"] , stderr=subprocess.STDOUT)
 		except subprocess.CalledProcessError as e:
 			print(suggestions(e.output))
-			rospy.loginfo(suggestions(e.output))
 			# print("Error occured while running the code. You can consult the administrators")
 			return
 	else:
@@ -51,7 +50,6 @@ def run_gpt_code(num):
 			result = subprocess.check_output(["python","./LLM/gpt_code_"+str(num)+".py"] , stderr=subprocess.STDOUT)
 		except subprocess.CalledProcessError as e:
 			print(suggestions(e.output))
-			rospy.loginfo(suggestions(e.output))
 			# print("Error occured while running the code. You can consult the administrators")
 			return
 
@@ -140,10 +138,6 @@ def suggestions(result):
 		result += "\n There is an ROS initialization error in the code. Try adding 'rospy.init_node(\'gpt\')' before lib = Functionlib()"
 	if "ImportError" in result:
 		result += "\n There is an import error in the code. Please check if all necessary libraries were properly imported."
-	# if "TypeError" in result:
-	# 	result += "\n There is an type error in the code. Please try "
-	if "Timeout occurred while waiting for marker" in result:
-		result += "\n One or more markers are not visible in the environment. Please check if all markers are visible and try again."
 	return result
 
 def parse_output(result):
@@ -246,8 +240,8 @@ class startUpWindow(QMainWindow):
 		global window, robot, abstractionLevel
 		robot = self.combobox1.currentText()
 		abstractionLevel = self.combobox2.currentText()
-		rospy.loginfo("Selected Robot: "+robot+" and abstraction level: "+abstractionLevel)
 		window = MainWindow()
+		window.node.get_logger().info("Selected Robot: "+robot+" and abstraction level: "+abstractionLevel)
 		window.timer.start(100)
 		window.hide_show()
 		# window.hide_show_tree()
@@ -259,14 +253,15 @@ class MainWindow(QMainWindow):
 		super(MainWindow, self).__init__(*args, **kwargs)
 
 		#GUI node
-		rospy.init_node('GUI')
-		rospy.Subscriber("/llm_response", String ,self.store_llm_response)
-		rospy.Subscriber("/run_gpt_code", String, self.store_run_gpt_code)
-		rospy.Subscriber("/speech_text", String, self.store_user_speech)
-		self.chatPublisher=rospy.Publisher("/llm_propmt", String,queue_size=10)
-		self.robot_name_pub=rospy.Publisher("/start_llm",String,queue_size=1)
-		self.abstraction_pub=rospy.Publisher("/abstraction",String,queue_size=1)
-		self.whisper_pub=rospy.Publisher("/whisper",String,queue_size=1)
+		rclpy.init(args=sys.argv)
+		self.node = rclpy.create_node('GUI')
+		self.node.create_subscription("/llm_response", String ,self.store_llm_response,rclpy.qos.QoSProfile())
+		self.node.create_subscription("/run_gpt_code", String, self.store_run_gpt_code,rclpy.qos.QoSProfile())
+		self.node.create_subscription("/speech_text", String, self.store_user_speech,rclpy.qos.QoSProfile())
+		self.chatPublisher=self.node.create_publisher(String, "/llm_propmt",10)
+		self.robot_name_pub=self.node.create_publisher(String, "/start_llm",1)
+		self.abstraction_pub=self.node.create_publisher(String, "/abstraction",1)
+		self.whisper_pub=self.node.create_publisher(String, "/whisper",1)
 
 		self.llm_responses=[]
 		self.user_speech=[]
@@ -589,7 +584,7 @@ class MainWindow(QMainWindow):
 		#self.console.eval_queued()
 		self.run_flag=False
 		self.robot_name_pub.publish(robot)
-		rospy.sleep(1)
+		time.sleep(1)
 		self.abstraction_pub.publish(abstractionLevel)
 
 		# The status of the editor (not hidden)
@@ -773,7 +768,7 @@ class MainWindow(QMainWindow):
 	# chatbox send message to llm 
 	def send_message(self):
 		prompt=self.message.text()
-		rospy.loginfo(prompt)
+		self.node.get_logger().info(prompt)
 		self.chatPublisher.publish(prompt)
 		self.message.clear()
 		self.text_area.moveCursor(QTextCursor.End)
@@ -836,7 +831,7 @@ class MainWindow(QMainWindow):
 	def display_record_content(self):
 		if self.record_updated or len(self.user_speech)>self.last_displayed_speech:
 			new_response=self.user_speech[self.last_displayed_speech]
-			rospy.loginfo(new_response)
+			self.node.get_logger().info(new_response)
 			self.chatPublisher.publish(new_response)
 			self.text_area.moveCursor(QTextCursor.End)
 			self.text_area.setTextColor(self.redColor)

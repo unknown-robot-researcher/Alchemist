@@ -2,37 +2,37 @@ import openai
 import re
 import math, copy
 import numpy as np
-import os
-import json
-import time, shutil
-import rospy
+import os, sys, json, time, shutil
+import rclpy
+from rclpy.wait_for_message import wait_for_message
 from std_msgs.msg import String
 from collections import OrderedDict
 
 class GPT():
     def __init__(self):
 
-        rospy.init_node("gpt_controller")
-        robot_name=rospy.wait_for_message("/start_llm",String)
-        rospy.loginfo("got robot name")
-        abstraction=rospy.wait_for_message("/abstraction",String)
-        rospy.loginfo("got abstraction level")
-        self.responsePublisher=rospy.Publisher("/llm_response",String,queue_size=10)
-        self.execPublisher=rospy.Publisher("/run_gpt_code", String, queue_size=1)
+        self.node = rclpy.create_node("gpt_controller")
+        self.logger = self.node.get_logger()
+        _,robot_name=wait_for_message(String, self.node, "/start_llm")
+        self.logger.info("got robot name")
+        _,abstraction=wait_for_message(String, self.node, "/abstraction")
+        self.logger.info("got abstraction level")
+        self.responsePublisher=self.node.create_publisher(String,"/llm_response",10)
+        self.execPublisher=self.node.create_publisher(String, "/run_gpt_code", 1)
 
         self.robot_name=robot_name.data.lower()
         self.abstraction=abstraction.data.lower()
 
         self.reset_count=0
 
-        rospy.sleep(3)
+        time.sleep(3)
 
         open('./LLM/chat_history.txt', 'w').close()
 
         with open("./LLM/Lib/"+self.robot_name+"/config.json", "r") as f:
             self.config = json.load(f)
 
-        rospy.loginfo("Initializing ChatGPT...")
+        self.logger.info("Initializing ChatGPT...")
 
         openai.api_key = self.config["OPENAI_API_KEY"]
         self.last_response=''
@@ -44,8 +44,9 @@ class GPT():
 
         self.inits=OrderedDict()
         self.inits["from Lib."+self.robot_name+".FunctionLibrary import FunctionLib"] = -1
-        self.inits["import rospy"] = -1
-        self.inits["rospy.init_node(\'gpt\')"] = -1
+        self.inits["import rclpy"] = -1
+        self.inits["rclpy.init()"] = -1
+        self.inits["node = rclpy.create_node(\'gpt\')"] = -1
         self.inits["lib = FunctionLib()"] = -1
 
         with open(self.sysprompt_path, "r") as f:
@@ -66,74 +67,40 @@ class GPT():
             },
             {
                 "role": "user",
-                "content": self.prompt + " \n Pick up the graduated cylinder with water inside and pour its content into 500mL beaker. After pouring, place the graduated cylinder at marker 6."
+                "content": self.prompt + " \n Move robot arm up by 5cm."
             },
             {
                 "role": "assistant",
                 "content": """```python
 from Lib."""+self.robot_name+""".FunctionLibrary import FunctionLib
-import rospy
+import rclpy
 
-# Initialize rospy node called gpt
-rospy.init_node('gpt')
+# Create rclpy node called gpt
+rclpy.init()
+node = rclpy.create_node(\'gpt\')
 
 # Initialize function library
 lib = FunctionLib()
 
-lib.move_to_home_position()
-rospy.sleep(2)
+# Get gripper current pose
+gripper_pose = lib.get_gripper_pose()
 
-# get the graduated cylinder's name by calling get_object_name_by_contents function
-object_name = lib.get_object_name_by_contents("water")
+# Add 0.05 meters to Z axis of current pose
+gripper_pose[2] +=0.05
 
-# Get the graduated cylinder dimensions by calling get_object_dimensions function
-dims=lib.get_object_dimensions(object_name)
-if dims is not None:
-    cylinder_radius = dims[0]
-    cylinder_height = dims[1]
-
-# Get the locations of marker 6, cylinder and 500mL beaker
-marker_6_location = lib.get_marker_location(6)
-cylinder_location = lib.get_object_location(object_name)
-
-if marker_6_location is None:
-    print("Marker 6 not found. Please check the environment.")
-    exit()
-
-# Move above 0.05 meters of the top of the cylinder
-success = lib.go(cylinder_location[0], cylinder_location[1], cylinder_location[2] + cylinder_height / 2.0 + 0.05, 
-                 cylinder_location[3], cylinder_location[4], cylinder_location[5]) 
-
-# Move down to grasp the cylinder
-success = lib.go(cylinder_location[0], cylinder_location[1], cylinder_location[2], 
-                 cylinder_location[3], cylinder_location[4], cylinder_location[5])
-
-# Close the gripper to grasp the cylinder
-lib.close_gripper(object_name)
-
-# Pour to 500mL beaker
-lib.pour("beaker 500mL")
-
-# Move to marker 6's location
-success = lib.go(marker_6_location[0], marker_6_location[1], marker_6_location[2] + cylinder_height / 2.0,
-                 marker_6_location[3], marker_6_location[4], marker_6_location[5])
-
-# Open the gripper to release the cylinder
-lib.open_gripper()
-
-lib.move_to_home_position()
-rospy.sleep(0.5)
+# Move up by 0.05 meters 
+lib.move_gripper(gripper_pose)
 
 print("Task finished")
 ```
-This code picks the graduated cylinder with water inside and pours it into 500mL beaker then places the cylinder in front of marker 6."""
+This code gets the current pose of the gripper and moves it up by 0.05 meters."""
             }
         ]
 
         #self.ask(self.env_prompt + self.prompt)
         self.init_history = copy.deepcopy(self.chat_history)
         self.responsePublisher.publish("Welcome to the "+ self.robot_name +" chatbot! I am ready to help you with your "+ self.robot_name +" questions and commands.")
-        rospy.loginfo("Done")
+        self.logger.info("Done")
 
 
     def ask(self, prompt):
@@ -176,11 +143,11 @@ This code picks the graduated cylinder with water inside and pours it into 500mL
         chat = copy.deepcopy(self.chat_history)
         chat[1:3]=copy.deepcopy(self.chat_history[-3:-1])
         
-        rospy.loginfo("History reduced")
+        self.logger.info("History reduced")
         self.chat_history = copy.deepcopy(chat[0:5])
 
     def reset_history(self):
-        rospy.loginfo("GPT History Resetted")
+        self.logger.info("GPT History Resetted")
         self.chat_history = copy.deepcopy(self.init_history)
         self.reset_count+=1
 
@@ -220,7 +187,7 @@ This code picks the graduated cylinder with water inside and pours it into 500mL
                 else: 
                     key_number = val+1
 
-        rospy_line_num = self.inits["rospy.init_node(\'gpt\')"]
+        rospy_line_num = self.inits["rclpy.init()"]
         rospy_line = data[rospy_line_num]
         lib_line_num = self.inits["lib = FunctionLib()"]
         lib_line = data[lib_line_num]
@@ -284,12 +251,10 @@ This code picks the graduated cylinder with water inside and pours it into 500mL
     def get_gpt_response(self,question):
 
         question = self.add_grounding_to_prompt(question)
-        # rospy.loginfo("Grounded prompt: "+question)
-
         try:
             response = self.ask(question)
         except:
-            rospy.loginfo("Exceeded number of tokens. Code not generated")
+            self.logger.info("Exceeded number of tokens. Code not generated")
             self.reset_history()
             return False
         
@@ -313,15 +278,15 @@ This code picks the graduated cylinder with water inside and pours it into 500mL
             self.verify_code("./LLM/gpt_code.py")
             self.code_python_version_correction("./LLM/gpt_code.py")
             try:
-                rospy.loginfo("running code...")
+                self.logger.info("running code...")
                 self.execPublisher.publish("True")
             except Exception as e:
                 self.responsePublisher.publish("An exception occured while running the code!\n")
-                rospy.loginfo("exception occured while running code")
+                self.logger.info("exception occured while running code")
                 print(e)
             else:
                 self.responsePublisher.publish("Ready!")
-                rospy.loginfo("Ready for running the code")
+                self.logger.info("Ready for running the code")
 
             h.close()
 
@@ -333,14 +298,15 @@ This code picks the graduated cylinder with water inside and pours it into 500mL
             return False
 
 if __name__ == '__main__':
+    rclpy.init(args=sys.argv)
     files=1
     reset=True
     gpt=GPT()
     
-    while not rospy.is_shutdown():
+    while rclpy.ok():
         flag=False
 
-        question = rospy.wait_for_message("/llm_propmt",String)
+        _,question = wait_for_message(String, gpt.node, "/llm_propmt")
         question = question.data
 
         if question == "!quit" or question == "!exit":
@@ -359,8 +325,9 @@ if __name__ == '__main__':
             
         while not flag:
             flag=gpt.get_gpt_response(question)
-            rospy.loginfo("in the loop.")
+            gpt.logger.info("in the loop.")
             if gpt.reset_count > 1:
                 break
 
-    rospy.loginfo("LLM Node killed.")
+    gpt.logger.info("LLM Node killed.")
+    rclpy.shutdown()
