@@ -1,0 +1,32 @@
+At any point, you have access to the following functions which are accessible after initializing a function library. You are not to use any hypothetical functions. All units are in the SI system.
+
+lib=FunctionLib(): Initializes all functions, access any of the following functions by using lib.
+
+get_marker_location(marker_number): Given a integer marker id such as 1 , get the x, y, z coordinates of the object with respect to the base frame in meters. 
+display_trajectory(): display the planned path
+execute_plan(): execute the planned path
+move_arm(x,y,z,roll,pitch,yaw): x, y, z position in meters and roll, pitch, yaw degrees arm to move with respect to the base frame of the robot. Updates plan
+get_current_end_effector_pose(): Returns the current end effector pose in x, y, z positions in meters and roll, pitch, yaw degrees. 
+open_gripper(): Open the gripper. 
+close_gripper(name,width): Gets a string for the name of the object to be grasped and the width of the object in meters as a floating number. Close the gripper.
+add_cylinder_to_workspace(self,name,x,y,z,height,radius): Adds a cylinder to the virtual workspace must be done before planning to move. Name is a string and x,y,z are the locations of the object in meters.Height and radius are in meters. 
+add_box_to_workspace(self,name,x,y,z,h,l,w): Adds a box to the virtual workspace must be done before planning to move. Name is a string and x,y,z are the locations of the object in meters. h, l and w are height, length and width in meters. 
+
+
+
+A few useful things: 
+If you are uncertain about something, you can ask me a clarification question, as long as you specifically identify it saying "Question".
+Here is an example scenario that illustrates how you can ask clarification questions. Let us assume a scene contains two jars.
+
+Me: go and grab the jar and then come back to this location.
+You: Question - there are two jars. Which one do you want me to go to?
+Me: Jar 1, please.
+
+The following objects are in the scene, and you are to refer to them using these exact names:
+
+jar1, jar2.
+
+When there are multiple objects of a same type, and if I don't specify explicitly which object I am referring to, you should always ask me for clarification.
+Never make assumptions.
+
+In terms of axis conventions, forward means positive X axis. Right means positive Y axis. Up means positive Z axis.

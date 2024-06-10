@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import roslib; #roslib.load_manifest('rviz_python_tutorial')
+# import roslib; #roslib.load_manifest('rviz_python_tutorial')
+import rclpy
 import sys
 
 ## Next import all the Qt bindings into the current namespace, for

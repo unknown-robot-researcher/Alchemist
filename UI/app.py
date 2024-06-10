@@ -3,7 +3,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtPrintSupport import *
-from UI.rviz_widget.myviz import MyViz
+# from UI.rviz_widget.myviz import MyViz
 import os, time
 import sys
 import rclpy
@@ -210,7 +210,7 @@ class startUpWindow(QMainWindow):
 		super(startUpWindow,self).__init__()
 		layout = QVBoxLayout()
 		self.combobox1 = QComboBox()
-		self.combobox1.addItems(['Panda', 'UR5', 'TIAGo'])
+		self.combobox1.addItems(['Panda', 'UR5', 'TIAGo','xArm7'])
 		label1 = QLabel("Select Robot Platform")
 		self.combobox2 = QComboBox()
 		self.combobox2.addItems(['Low', 'High'])
@@ -253,11 +253,10 @@ class MainWindow(QMainWindow):
 		super(MainWindow, self).__init__(*args, **kwargs)
 
 		#GUI node
-		rclpy.init(args=sys.argv)
 		self.node = rclpy.create_node('GUI')
-		self.node.create_subscription("/llm_response", String ,self.store_llm_response,rclpy.qos.QoSProfile())
-		self.node.create_subscription("/run_gpt_code", String, self.store_run_gpt_code,rclpy.qos.QoSProfile())
-		self.node.create_subscription("/speech_text", String, self.store_user_speech,rclpy.qos.QoSProfile())
+		self.node.create_subscription(String, "/llm_response" ,self.store_llm_response,10)
+		self.node.create_subscription(String, "/run_gpt_code", self.store_run_gpt_code,10)
+		self.node.create_subscription(String, "/speech_text", self.store_user_speech,10)
 		self.chatPublisher=self.node.create_publisher(String, "/llm_propmt",10)
 		self.robot_name_pub=self.node.create_publisher(String, "/start_llm",1)
 		self.abstraction_pub=self.node.create_publisher(String, "/abstraction",1)
@@ -274,7 +273,6 @@ class MainWindow(QMainWindow):
 		self.timer.timeout.connect(self.display_record_content)
 		self.timer.start(1000)
 
-		#self.gpt=GPT()
 		# Center Screen
 		qtRectangle = self.frameGeometry()
 		centerPoint = QDesktopWidget().availableGeometry().center()
@@ -348,7 +346,7 @@ class MainWindow(QMainWindow):
 		self.__highlighter = PythonHighlighter(self.editor.document())
 		# layout2.addWidget(self.editor)
 
-		self.rviz=MyViz(robot)
+		# self.rviz=MyViz(robot)
 
 		self.console = PythonConsole()
 		self.console.push_local_ns('run', run_gpt_code)
@@ -374,7 +372,7 @@ class MainWindow(QMainWindow):
 
 		editor_rviz_splitter.addWidget(self.tree)
 		editor_rviz_splitter.addWidget(self.editor)
-		editor_rviz_splitter.addWidget(self.rviz)
+		# editor_rviz_splitter.addWidget(self.rviz)
 		layout2.addWidget(editor_rviz_splitter)
 		editor_rviz_splitter.setStretchFactor(1, 2)
 
@@ -583,9 +581,12 @@ class MainWindow(QMainWindow):
 		self.console.eval_in_thread()
 		#self.console.eval_queued()
 		self.run_flag=False
-		self.robot_name_pub.publish(robot)
+		msg = String()
+		msg.data = robot
+		self.robot_name_pub.publish(msg)
 		time.sleep(1)
-		self.abstraction_pub.publish(abstractionLevel)
+		msg.data = abstractionLevel
+		self.abstraction_pub.publish(msg)
 
 		# The status of the editor (not hidden)
 		self.hidden = False
@@ -742,12 +743,15 @@ class MainWindow(QMainWindow):
 
 
 	def speech_record(self):
+		msg = String()
 		if self.record_pressed:
 			self.record_pressed = False
-			self.whisper_pub.publish("True")
+			msg.data = "True"
+			self.whisper_pub.publish(msg)
 		else:
 			self.record_pressed = True
-			self.whisper_pub.publish("False")
+			msg.data = "False"
+			self.whisper_pub.publish(msg)
 
 
 
@@ -769,7 +773,9 @@ class MainWindow(QMainWindow):
 	def send_message(self):
 		prompt=self.message.text()
 		self.node.get_logger().info(prompt)
-		self.chatPublisher.publish(prompt)
+		msg = String()
+		msg.data = prompt
+		self.chatPublisher.publish(msg)
 		self.message.clear()
 		self.text_area.moveCursor(QTextCursor.End)
 		self.text_area.setTextColor(self.redColor)
@@ -781,11 +787,15 @@ class MainWindow(QMainWindow):
 
 	def save_gpt_code(self):
 		print("Saving code...")
-		self.chatPublisher.publish("save")
+		msg = String()
+		msg.data = "save"
+		self.chatPublisher.publish(msg)
 
 	def reset_gpt(self):
 		print("Resetting LLM...")
-		self.chatPublisher.publish("reset")
+		msg = String()
+		msg.data = "reset"
+		self.chatPublisher.publish(msg)
 
 	def store_llm_response(self,data):
 		new_response=data.data
@@ -832,7 +842,9 @@ class MainWindow(QMainWindow):
 		if self.record_updated or len(self.user_speech)>self.last_displayed_speech:
 			new_response=self.user_speech[self.last_displayed_speech]
 			self.node.get_logger().info(new_response)
-			self.chatPublisher.publish(new_response)
+			msg = String()
+			msg.data = new_response
+			self.chatPublisher.publish(msg)
 			self.text_area.moveCursor(QTextCursor.End)
 			self.text_area.setTextColor(self.redColor)
 			self.text_area.append("User> ")
@@ -877,7 +889,7 @@ def closing_whisper():
 #if __name__ == '__main__':
 
 def Main():
-
+	rclpy.init()
 	global window
 
 	# creating PyQt5 application

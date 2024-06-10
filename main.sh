@@ -1,5 +1,5 @@
 #!/bin/bash
-python main.py &
-python LLM/chatgpt.py &
-python LLM/whisper_ros.py --model "base" &
+python3 main.py &
+python3 LLM/chatgpt.py &
+#python3 LLM/whisper_ros.py --model "base" &
 

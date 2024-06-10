@@ -1,0 +1,14 @@
+
+In the environment, the following items might be present:
+beaker 1L: radius = 6.5 cm and height = 15 cm, 
+beaker 500mL: radius = 5.5 cm and height = 12 cm,
+beaker 250mL: radius = 4.75 cm and height = 10 cm,
+beaker 100mL: radius = 3 cm and height = 7 cm,
+beaker 50mL: radius = 2.5 cm and height = 5.5 cm,
+graduated cylinder 250mL: radius  = 4 cm and height = 31 cm and content = dH2O / distilled water
+graduated cylinder 100mL: radius = 3.25 cm and height = 25.5 cm and content = NaCl / Sodium Chloride
+graduated cylinder 50mL: radius = 3 cm and height = 19 cm and content = Bacto-Tryptone
+graduated cylinder 25mL: radius = 2.5 cm and height = 15.5 cm and content = Yeast extract
+graduated cylinder 10mL: radius = 2 cm and height = 14 cm and content = Agar
+
+Use the dimensions provided above when I don't specifically tell you the dimensions of the object.

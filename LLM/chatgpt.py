@@ -1,10 +1,11 @@
-import openai
+from openai import OpenAI
 import re
 import math, copy
 import numpy as np
 import os, sys, json, time, shutil
 import rclpy
-from rclpy.wait_for_message import wait_for_message
+sys.path.append("./")
+from Utils.wait_ros2 import wait_for_message
 from std_msgs.msg import String
 from collections import OrderedDict
 
@@ -24,7 +25,6 @@ class GPT():
         self.abstraction=abstraction.data.lower()
 
         self.reset_count=0
-
         time.sleep(3)
 
         open('./LLM/chat_history.txt', 'w').close()
@@ -34,7 +34,8 @@ class GPT():
 
         self.logger.info("Initializing ChatGPT...")
 
-        openai.api_key = self.config["OPENAI_API_KEY"]
+        #openai.api_key = self.config["OPENAI_API_KEY"]
+        self.client = OpenAI(api_key=self.config["OPENAI_API_KEY"])
         self.last_response=''
 
         self.sysprompt_path = "./LLM/Lib/"+self.robot_name+"/system_prompts/basic.txt"
@@ -99,7 +100,9 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
 
         #self.ask(self.env_prompt + self.prompt)
         self.init_history = copy.deepcopy(self.chat_history)
-        self.responsePublisher.publish("Welcome to the "+ self.robot_name +" chatbot! I am ready to help you with your "+ self.robot_name +" questions and commands.")
+        msg = String()
+        msg.data ="Welcome to the "+ self.robot_name +" chatbot! I am ready to help you with your "+ self.robot_name +" questions and commands."
+        self.responsePublisher.publish(msg)
         self.logger.info("Done")
 
 
@@ -110,10 +113,9 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
                 "content": prompt,
             }
         )
-        completion = openai.ChatCompletion.create(
-            model="gpt-4", #"gpt-3.5-turbo-0613",#"gpt-3.5-turbo",
+        completion = self.client.chat.completions.create(
+            model="gpt-4o",
             messages=self.chat_history
-            # temperature=0
         )
         self.chat_history.append(
             {
@@ -268,24 +270,32 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
         code = self.extract_python_code(response)
 
         text = self.extract_text(response)
+        msg = String()
+        msg.data = text
 
         if code is not None:
-            self.responsePublisher.publish(text)
-            self.responsePublisher.publish("Please run the code by using the terminal...")
-            codeByLLM=self.extract_python_code(response)
-            f.write(codeByLLM)
+            self.responsePublisher.publish(msg)
+            # self.responsePublisher.publish("Please run the code by using the terminal...")
+            # codeByLLM=self.extract_python_code(response)
+            f.write(code)
             f.close()
-            self.verify_code("./LLM/gpt_code.py")
-            self.code_python_version_correction("./LLM/gpt_code.py")
+            # self.verify_code("./LLM/gpt_code.py")
+            # self.code_python_version_correction("./LLM/gpt_code.py")
             try:
                 self.logger.info("running code...")
-                self.execPublisher.publish("True")
+                msg = String()
+                msg.data = "True"
+                self.execPublisher.publish(msg)
             except Exception as e:
-                self.responsePublisher.publish("An exception occured while running the code!\n")
+                msg = String()
+                msg.data = "An exception occured while running the code!\n"
+                self.responsePublisher.publish(msg)
                 self.logger.info("exception occured while running code")
                 print(e)
             else:
-                self.responsePublisher.publish("Ready!")
+                msg = String()
+                msg.data = "Ready!"
+                self.responsePublisher.publish(msg)
                 self.logger.info("Ready for running the code")
 
             h.close()
