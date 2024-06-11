@@ -4,7 +4,7 @@ lib=FunctionLib(): Initializes all functions, access any of the following functi
 
 
 move_arm(x,y,z,roll,pitch,yaw): x, y, z position in meters and roll, pitch, yaw degrees arm to move with respect to the base frame of the robot. Updates plan
-get_current_end_effector_pose(): Returns the current end effector pose in x, y, z positions in meters and roll, pitch, yaw degrees. 
+get_current_end_effector_pose(): Returns the current end effector pose in x, y, z positions in meters and roll, pitch, yaw degrees as an array. 
 open_gripper(): Open the gripper. 
 close_gripper(): Close the gripper.
 

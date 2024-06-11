@@ -7,6 +7,7 @@ from PyQt5.QtPrintSupport import *
 import os, time
 import sys
 import rclpy
+from rclpy.node import Node
 from std_msgs.msg import String 
 from std_msgs.msg import Bool
 from UI.codeEditor.higlight import PythonHighlighter
@@ -16,6 +17,7 @@ from threading import Thread
 os.environ["QT_API"] = "pyqt5"
 from pyqtconsole.console import PythonConsole
 import subprocess
+from rclpy.executors import MultiThreadedExecutor
 
 def help():
 	help_txt = """
@@ -40,14 +42,14 @@ def run_gpt_code(num):
 	print("Running GPT Code")
 	if num == 0:
 		try:
-			result = subprocess.check_output(["python","./LLM/gpt_code.py"] , stderr=subprocess.STDOUT)
+			result = subprocess.check_output(["python3","./LLM/gpt_code.py"] , stderr=subprocess.STDOUT)
 		except subprocess.CalledProcessError as e:
 			print(suggestions(e.output))
 			# print("Error occured while running the code. You can consult the administrators")
 			return
 	else:
 		try:
-			result = subprocess.check_output(["python","./LLM/gpt_code_"+str(num)+".py"] , stderr=subprocess.STDOUT)
+			result = subprocess.check_output(["python3","./LLM/gpt_code_"+str(num)+".py"] , stderr=subprocess.STDOUT)
 		except subprocess.CalledProcessError as e:
 			print(suggestions(e.output))
 			# print("Error occured while running the code. You can consult the administrators")
@@ -58,14 +60,14 @@ def run_gpt_code(num):
 
 def setup():
 	print("Setting up the basic environment...")
-	result = subprocess.check_output(["python","./LLM/setup_env.py"])
+	result = subprocess.check_output(["python3","./LLM/setup_env.py"])
 	result = parse_output(result)
 	print(result)
 	print("Done")
 
 def home():
 	print("Moving the robot back to home position...")
-	result = subprocess.check_output(["python","./LLM/move_to_home.py"])
+	result = subprocess.check_output(["python3","./LLM/move_to_home.py"])
 	result = parse_output(result)
 	print(result)
 	print("Done")
@@ -110,7 +112,7 @@ def run_gpt_function(num,inputs):
 				change_function_call("./LLM/gpt_code.py",function_call_line,inputs,func_sign=function_sign)
 			else:
 				change_function_call("./LLM/gpt_code.py",function_call_line,inputs)
-			result = subprocess.check_output(["python","./LLM/gpt_code.py"])
+			result = subprocess.check_output(["python3","./LLM/gpt_code.py"])
 		else:
 			print("No functions are found in this file.")
 	else:
@@ -124,7 +126,7 @@ def run_gpt_function(num,inputs):
 				change_function_call("./LLM/gpt_code_"+str(num)+".py",function_call_line,inputs,func_sign=function_sign)
 			else:
 				change_function_call("./LLM/gpt_code_"+str(num)+".py",function_call_line,inputs)
-			result = subprocess.check_output(["python","./LLM/gpt_code_"+str(num)+".py"])
+			result = subprocess.check_output(["python3","./LLM/gpt_code_"+str(num)+".py"])
 		else:
 			print("No functions are found in this file.")
 	if found:
@@ -205,9 +207,9 @@ def change_function_call(file_path,fcall_line,inputs,func_sign=""):
 		file.writelines(data)
 
 
-class startUpWindow(QMainWindow):
-	def __init__(self):
-		super(startUpWindow,self).__init__()
+class startUpWindow(Node):
+	def __init__(self,ui):
+		super(startUpWindow,self).__init__("GUI")
 		layout = QVBoxLayout()
 		self.combobox1 = QComboBox()
 		self.combobox1.addItems(['xArm7','Panda', 'UR5', 'TIAGo'])
@@ -228,33 +230,35 @@ class startUpWindow(QMainWindow):
 		container.setLayout(layout)
 
 		# Center Screen
-		qtRectangle = self.frameGeometry()
+		qtRectangle = ui.frameGeometry()
 		centerPoint = QDesktopWidget().availableGeometry().center()
 		qtRectangle.moveCenter(centerPoint)
-		self.move(qtRectangle.topLeft())
+		ui.move(qtRectangle.topLeft())
 
 		# making container as central widget
-		self.setCentralWidget(container)
+		ui.setCentralWidget(container)
+		self.ui = ui
 		
 	def showMainWindow(self):
 		global window, robot, abstractionLevel
 		robot = self.combobox1.currentText()
 		abstractionLevel = self.combobox2.currentText()
-		window = MainWindow()
-		window.node.get_logger().info("Selected Robot: "+robot+" and abstraction level: "+abstractionLevel)
+		window = MainWindow(self.ui,self)
+		self.get_logger().info("Selected Robot: "+robot+" and abstraction level: "+abstractionLevel)
 		window.timer.start(100)
 		window.hide_show()
 		# window.hide_show_tree()
 
 
-class MainWindow(QMainWindow):
+class MainWindow():
 
-	def __init__(self,*args, **kwargs):
-		super(MainWindow, self).__init__(*args, **kwargs)
-
+	def __init__(self,ui,node):
+		super(MainWindow, self).__init__()
+		self.ui = ui
+		self.node = node
 		#GUI node
-		self.node = rclpy.create_node('GUI')
-		self.resp_sub = self.node.create_subscription(String, "/llm_response" ,self.store_llm_response,1)
+		#self.node = rclpy.create_node('GUI')
+		self.resp_sub = self.node.create_subscription(String, "/llm_response" ,self.store_llm_response,10)
 
 		self.test_sub = self.node.create_subscription(String, "/test" ,self.test_topic,1)
 		
@@ -278,10 +282,10 @@ class MainWindow(QMainWindow):
 		self.timer.start(1000)
 
 		# Center Screen
-		qtRectangle = self.frameGeometry()
+		qtRectangle = ui.frameGeometry()
 		centerPoint = QDesktopWidget().availableGeometry().center()
 		qtRectangle.moveCenter(centerPoint)
-		self.move(qtRectangle.topLeft())
+		ui.move(qtRectangle.topLeft())
 
 		layout1 = QVBoxLayout()
 		layout2 = QHBoxLayout()
@@ -313,7 +317,7 @@ class MainWindow(QMainWindow):
 		# self.path holds the path of the currently open file.
 		# If none, we haven't got a file open yet (or creating new).
 		self.path = "./LLM/gpt_code.py"
-		speech_button = QPushButton(self)
+		speech_button = QPushButton(ui)
 		speech_button.setStatusTip("speech to text")
 		speech_button.setCheckable(True)
 		speech_button.setIcon(QIcon(QPixmap("./Alchemist/UI/icons/mic.png")))
@@ -403,29 +407,29 @@ class MainWindow(QMainWindow):
 		container.setLayout(layout1)
 
 		# making container as central widget
-		self.setCentralWidget(container)
+		ui.setCentralWidget(container)
 
 		# creating a status bar object
 		self.status = QStatusBar()
 
 		# setting stats bar to the window
-		self.setStatusBar(self.status)
+		ui.setStatusBar(self.status)
 
 		# creating another tool bar for editing text
 		view_toolbar = QToolBar("View")
 
 		# adding this tool bar to the main window
-		self.addToolBar(view_toolbar)
+		ui.addToolBar(view_toolbar)
 
 		# for toggling the directory tree
-		tree_toggle_action = QAction("File Tree", self)
+		tree_toggle_action = QAction("File Tree", ui)
 		tree_toggle_action.setStatusTip("Toggle to hide or show directory tree")
 		tree_toggle_action.triggered.connect(self.hide_show_tree)
 		# view_menu.addAction(toggle_action)
 		view_toolbar.addAction(tree_toggle_action)
 
 		# for toggling the editor
-		toggle_action = QAction("Editor", self)
+		toggle_action = QAction("Editor", ui)
 		toggle_action.setStatusTip("Toggle to hide or show editor window")
 		toggle_action.triggered.connect(self.hide_show)
 		# view_menu.addAction(toggle_action)
@@ -435,14 +439,14 @@ class MainWindow(QMainWindow):
 		file_toolbar = QToolBar("File")
 
 		# adding file tool bar to the window
-		self.addToolBar(file_toolbar)
+		ui.addToolBar(file_toolbar)
 
 		# creating a file menu
-		file_menu = self.menuBar().addMenu("&File")
+		file_menu = ui.menuBar().addMenu("&File")
 
 		# creating actions to add in the file menu
 		# creating a open file action
-		open_file_action = QAction("Open file", self)
+		open_file_action = QAction("Open file", ui)
 
 		# setting status tip
 		open_file_action.setStatusTip("Open file")
@@ -457,25 +461,25 @@ class MainWindow(QMainWindow):
 		file_toolbar.addAction(open_file_action)
 
 		# similarly creating a save action
-		save_file_action = QAction("Save", self)
+		save_file_action = QAction("Save", ui)
 		save_file_action.setStatusTip("Save current page")
 		save_file_action.triggered.connect(self.file_save)
 		file_menu.addAction(save_file_action)
 		file_toolbar.addAction(save_file_action)
 
 		# [ctrl + s] shortcut to save file 
-		shortcut = QShortcut(QKeySequence.Save, self)
+		shortcut = QShortcut(QKeySequence.Save, ui)
 		shortcut.activated.connect(self.file_save)
 
 		# similarly creating save action
-		saveas_file_action = QAction("Save As", self)
+		saveas_file_action = QAction("Save As", ui)
 		saveas_file_action.setStatusTip("Save current page to specified file")
 		saveas_file_action.triggered.connect(self.file_saveas)
 		file_menu.addAction(saveas_file_action)
 		file_toolbar.addAction(saveas_file_action)
 
 		# for print action
-		print_action = QAction("Print", self)
+		print_action = QAction("Print", ui)
 		print_action.setStatusTip("Print current page")
 		print_action.triggered.connect(self.file_print)
 		file_menu.addAction(print_action)
@@ -485,15 +489,15 @@ class MainWindow(QMainWindow):
 		edit_toolbar = QToolBar("Edit")
 
 		# adding this tool bar to the main window
-		self.addToolBar(edit_toolbar)
+		ui.addToolBar(edit_toolbar)
 
 		# creating a edit menu bar
-		edit_menu = self.menuBar().addMenu("&Edit")
+		edit_menu = ui.menuBar().addMenu("&Edit")
 
 		# adding actions to the tool bar and menu bar
 
 		# undo action
-		undo_action = QAction("Undo", self)
+		undo_action = QAction("Undo", ui)
 		# adding status tip
 		undo_action.setStatusTip("Undo last change")
 
@@ -505,7 +509,7 @@ class MainWindow(QMainWindow):
 		edit_menu.addAction(undo_action)
 
 		# redo action
-		redo_action = QAction("Redo", self)
+		redo_action = QAction("Redo", ui)
 		redo_action.setStatusTip("Redo last change")
 
 		# when triggered redo the editor
@@ -516,7 +520,7 @@ class MainWindow(QMainWindow):
 		edit_menu.addAction(redo_action)
 
 		# cut action
-		cut_action = QAction("Cut", self)
+		cut_action = QAction("Cut", ui)
 		cut_action.setStatusTip("Cut selected text")
 
 		# when triggered cut the editor text
@@ -527,7 +531,7 @@ class MainWindow(QMainWindow):
 		edit_menu.addAction(cut_action)
 
 		# copy action
-		copy_action = QAction("Copy", self)
+		copy_action = QAction("Copy", ui)
 		copy_action.setStatusTip("Copy selected text")
 
 		# when triggered copy the editor text
@@ -538,7 +542,7 @@ class MainWindow(QMainWindow):
 		edit_menu.addAction(copy_action)
 
 		# paste action
-		paste_action = QAction("Paste", self)
+		paste_action = QAction("Paste", ui)
 		paste_action.setStatusTip("Paste from clipboard")
 
 		# when triggered paste the copied text
@@ -549,7 +553,7 @@ class MainWindow(QMainWindow):
 		edit_menu.addAction(paste_action)
 
 		# select all action
-		select_action = QAction("Select all", self)
+		select_action = QAction("Select all", ui)
 		select_action.setStatusTip("Select all text")
 
 		# when this triggered select the whole text
@@ -561,7 +565,7 @@ class MainWindow(QMainWindow):
 
 
 		# wrap action
-		wrap_action = QAction("Wrap text to window", self)
+		wrap_action = QAction("Wrap text to window", ui)
 		wrap_action.setStatusTip("Check to wrap text to window")
 
 		# making it checkable
@@ -580,7 +584,7 @@ class MainWindow(QMainWindow):
 		self.update_title()
 
 		# showing all the components
-		self.show()
+		ui.show()
 
 		self.console.eval_in_thread()
 		#self.console.eval_queued()
@@ -595,13 +599,15 @@ class MainWindow(QMainWindow):
 		# The status of the editor (not hidden)
 		self.hidden = False
 		self.tree_hidden = False
+		
+		
 
 	# creating dialog critical method
 	# to show errors
 	def dialog_critical(self, s):
 
 		# creating a QMessageBox object
-		dlg = QMessageBox(self)
+		dlg = QMessageBox(self.ui)
 
 		# setting text to the dlg
 		dlg.setText(s)
@@ -616,7 +622,7 @@ class MainWindow(QMainWindow):
 	def file_open(self):
 
 		# getting path and bool value
-		path, _ = QFileDialog.getOpenFileName(self, "Open file", "",
+		path, _ = QFileDialog.getOpenFileName(self.ui, "Open file", "",
 							"Text documents (*.txt);All files (*.*)")
 
 		# if path is true
@@ -764,7 +770,7 @@ class MainWindow(QMainWindow):
 
 		# setting window title with prefix as file name
 		# suffix as PyQt5 Notepad
-		self.setWindowTitle("%s - Natural Robot" %(os.path.basename(self.path)
+		self.ui.setWindowTitle("%s - Natural Robot" %(os.path.basename(self.path)
 												if self.path else "Untitled"))
 
 	# action called by edit toggle
@@ -803,7 +809,7 @@ class MainWindow(QMainWindow):
 
 	def store_llm_response(self,data):
 		new_response=data.data
-		print(new_response)
+		# print(new_response)
 		self.llm_responses.append(new_response)
 		self.updated=True
 
@@ -909,6 +915,11 @@ def Main():
 
 	# creating PyQt5 application
 	app = QApplication(sys.argv)
+	HMI = QMainWindow()
+	window_node = startUpWindow(HMI)
+
+	executor = MultiThreadedExecutor()
+	executor.add_node(window_node)
 
 	# setting application name
 	app.setApplicationName("Alchemist")
@@ -916,10 +927,20 @@ def Main():
 	app.aboutToQuit.connect(closing_whisper)
 
 
-	# creating a main window object
-	#window = MainWindow()
-	window = startUpWindow()
-	window.show()
+	thread = Thread(target=executor.spin)
+	thread.start()
+	window_node.get_logger().info("Spinned ROS2 Node . . .")
+
+    # Let the app running on the main thread
+	try:
+		HMI.show()
+		sys.exit(app.exec_())
+	finally:
+		window_node.get_logger().info("Shutting down ROS2 Node . . .")
+		window_node.destroy_node()
+		executor.shutdown()
+
+	# window.show()
 
 	# loop
-	sys.exit(app.exec_())
+	# sys.exit(app.exec_())
