@@ -1,13 +1,10 @@
 # https://github.com/davabase/whisper_real_time/blob/master/transcribe_demo.py
 
-import argparse
-import io
-import os
+import argparse,io,os,time
 import contextlib
 import speech_recognition as sr
 import whisper
-import torch
-import threading
+import torch,threading
 import rclpy
 from std_msgs.msg import String
 
@@ -45,7 +42,7 @@ def temporary_filename(suffix=None):
     os.unlink(tmp_name)
 
 class whisper_speech():
-    def __init__(self):
+    def __init__(self,logger):
         parser = argparse.ArgumentParser()
         parser.add_argument("--model", default="medium", help="Model to use",
                             choices=["tiny", "base", "small", "medium", "large"])
@@ -124,6 +121,7 @@ class whisper_speech():
                                 'Good luck.', 'Good luck', 'Good luck!', 'huh', 'Bye', 'Bye.'}
         self.start = False
         # self.stop_listening = self.recorder.listen_in_background(self.source, self.record_callback, phrase_time_limit=self.record_timeout)
+        self.logger = logger
         
         
     def record_callback(self, _, audio):
@@ -192,7 +190,7 @@ class whisper_speech():
                         print("found a space!: {", new_sentence + "}")
                         
                     elif new_sentence not in self.hallucination_set:
-                        rospy.sleep(0.1)
+                        time.sleep(0.1)
                         msg = String()
                         msg.data = new_sentence
                         pub.publish(msg)
@@ -201,40 +199,17 @@ class whisper_speech():
                     else:
                         print("found it! it's in the list: {", new_sentence, "}")
 
-
-                # If we detected a pause between recordings, add a new item to our transcripion.
-                # Otherwise edit the existing one.
-                ## MODIFYING THIS TO EXCLUDE HALLUCINATIONS FROM THE TRANSCRIPT
                 if correct_text: 
                     if phrase_complete:
                         self.transcription.append(text)
                     else:
                         self.transcription[-1] = text
 
-                # Clear the console to reprint the updated transcription.
-                # os.system('cls' if os.name=='nt' else 'clear')
-                # for line in self.transcription:
-                #     print(line)
-                # # Flush stdout.
-                # print('')
-                # print("[ Transcript List ]: " + str(self.transcription))
 
         else:
-            rospy.loginfo("whisper Node killed.")
-            rospy.signal_shutdown("shutting down whisper node") 
+            self.logger.info("whisper Node killed.")
+            rclpy.shutdown() 
 
-            # except KeyboardInterrupt:
-            #     break
-
-
-        # print("\n\nTranscription:")
-        # for line in self.transcription:
-        #     print(line)
-
-        # file = open('transcript.txt','w+')
-        # for line in self.transcription:
-        #     file.write(line+"\n")
-        # file.close()
 
 if __name__ == "__main__":
 

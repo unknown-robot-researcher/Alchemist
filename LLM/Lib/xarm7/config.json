@@ -1,5 +1,4 @@
 
 {
-    "OPENAI_API_KEY": "API_KEY_HERE",
-    "BARD_API_KEY":"API KEY HERE"
+    "OPENAI_API_KEY": "API_KEY_HERE"
 }

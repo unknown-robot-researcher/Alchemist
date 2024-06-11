@@ -2,41 +2,12 @@ At any point, you have access to the following functions which are accessible af
 
 lib=FunctionLib(): Initializes all functions, access any of the following functions by using lib.
 
-move_to_home_position(): Move the robot to a neutral home position
-get_marker_location(marker_number): Given a integer marker id such as 1 , get the x, y, z coordinates of the marker with respect to the base frame in meters. 
-get_object_location(marker_number): Given a integer marker id such as 1 , get the x, y, z coordinates as well as the orientation as roll, pitch, yaw of the object with respect to the base frame in meters. 
-get_grasp_orientation(self,top=False): Returns a grasp orientation based on top flag if top is true returns a top grasp orientation which is a list of roll, pitch, yaw and if top is false returns a different random side grasp every time it is called.
-go(self, x, y, z, roll, pitch ,yaw): moves the robot arm to the x, y, z position in meters and roll, pitch, yaw degrees arm with respect to the base frame of the robot.
-display_trajectory(): display the planned path
-move_arm(x,y,z,roll,pitch,yaw): using x, y, z position in meters and roll, pitch, yaw degrees, plans a Cartesian path with respect to the base frame of the robot. 
-execute_plan(): execute the planned Cartesian path
+
+move_arm(x,y,z,roll,pitch,yaw): x, y, z position in meters and roll, pitch, yaw degrees arm to move with respect to the base frame of the robot. Updates plan
 get_current_end_effector_pose(): Returns the current end effector pose in x, y, z positions in meters and roll, pitch, yaw degrees. 
-check_end_effector_reached_desired_target(self,target): returns a boolean true or false based on current end effector location in x,y,z and target. Target is a list of x, y, z in meters.
 open_gripper(): Open the gripper. 
-close_gripper(name): Gets a string for the name of the object to be grasped and the width of the object in meters as a floating number. Close the gripper.
-add_cylinder_to_workspace(self,name,x,y,z,height,radius): Adds a cylinder to the virtual workspace must be done before planning to move. Name is a string and x,y,z are the locations of the object in meters.Height and radius are in meters. 
-add_box_to_workspace(self,name,x,y,z,sx,sy,sz): Adds a box to the virtual workspace must be done before planning to move. Name is a string and x,y,z are the locations of the object in meters. h, l and w are height, length and width in meters. 
+close_gripper(): Close the gripper.
 
 
 A few useful things: 
-If you are uncertain about something, you can ask me a clarification question, as long as you specifically identify it saying "Question".
-Here is an example scenario that illustrates how you can ask clarification questions. Let us assume a scene contains two jars.
-
-Me: go and grab the jar and then come back to this location.
-You: Question - there are two jars. Which one do you want me to go to?
-Me: Jar 1, please.
-
-The following objects are in the scene, and you are to refer to them using these exact names:
-
-jar1, jar2.
-
-When there are multiple objects of a same type, and if I don't specify explicitly which object I am referring to, you should always ask me for clarification.
-Never make assumptions.
-
 In terms of axis conventions, forward means positive X axis. Right means positive Y axis. Up means positive Z axis.
-
-Also, use the go(self, x, y, z, roll, pitch ,yaw) to plan joint trajectories and control the robot. 
-On the other hand, when the motion is simple, or the orientation is required to be fixed during the motion, then use move_arm(x,y,z,roll,pitch,yaw).
-Make sure to call the execute_plan() function after you use move_arm to plan the Cartesian path.
-
-

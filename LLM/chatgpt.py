@@ -34,7 +34,6 @@ class GPT():
 
         self.logger.info("Initializing ChatGPT...")
 
-        #openai.api_key = self.config["OPENAI_API_KEY"]
         self.client = OpenAI(api_key=self.config["OPENAI_API_KEY"])
         self.last_response=''
 
@@ -98,7 +97,6 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
             }
         ]
 
-        #self.ask(self.env_prompt + self.prompt)
         self.init_history = copy.deepcopy(self.chat_history)
         msg = String()
         msg.data ="Welcome to the "+ self.robot_name +" chatbot! I am ready to help you with your "+ self.robot_name +" questions and commands."
@@ -154,12 +152,6 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
         self.reset_count+=1
 
     def add_grounding_to_prompt(self,question):
-        if "add" in question.lower() and "workspace" in question.lower():
-            question+=" Make sure to use marker location."
-
-        if "pour" in question.lower():
-             question+=" Don't move above the beaker before pouring, just call the pour function. Also, after pouring, make sure you place the object back to where it was on the table and then open the gripper to release it."
-
         if "function" in question.lower() or "generic" in question.lower() or "code" in question.lower():
             question+= " If you wrote a function, remember to add a example function call at the end."
 
@@ -201,55 +193,6 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
         with open(file_path, "w") as file:
             file.writelines(data)
 
-    def convert_fstrings_to_format(self, input_string):
-        # Define a regular expression pattern to match f-string statements
-        fstring_pattern = r'f"([^\"]*)"'
-        
-        # Use regex to find all f-string statements in the input string
-        fstring_matches = re.findall(fstring_pattern, input_string)
-        res=""
-        # Replace f-string statements with .format() method calls
-        for match in fstring_matches:
-            format_args = re.findall(r'\{([^\}]*)\}', match)
-            format_args = ', '.join(format_args)
-            format_method_call = '\"{}\"'.format(match)
-            # format_method_call = re.sub(format_args,'{}',match)+'".format({})"'.format(format_args)
-            input_string = input_string.replace('f"{}"'.format(match), format_method_call)
-            # re.sub("\{.*?\}","\{\}", input_string)
-            x=input_string.replace("{","*{")
-            x=x.replace("}","}*")
-            y=x.split("*")
-            res=""
-
-            for i in y:
-                if len(i)!=0:
-                    if i[0]=="{" and i[-1]=="}":
-                        res+="{}"
-                    else:
-                        res+=i
-
-            res="".join(res)
-            if res[-1] == "\n":
-                res = res[:-2]+(".format("+format_args+")")+res[-2:]
-            else:
-                res = res[:-1]+(".format("+format_args+")")+res[-1:]
-
-        if res == "":
-            return input_string
-        else:
-            return res
-
-    def code_python_version_correction(self, file_path):
-            with open(file_path, "r") as file:   
-                data = file.readlines()
-                res=""
-                for i, line in enumerate(data):
-                    corrected_line = self.convert_fstrings_to_format(line)
-                    print(corrected_line)
-                    res +=(corrected_line)
-            with open(file_path, "w") as file:
-                file.writelines(res)
-
     def get_gpt_response(self,question):
 
         question = self.add_grounding_to_prompt(question)
@@ -275,12 +218,9 @@ This code gets the current pose of the gripper and moves it up by 0.05 meters.""
 
         if code is not None:
             self.responsePublisher.publish(msg)
-            # self.responsePublisher.publish("Please run the code by using the terminal...")
-            # codeByLLM=self.extract_python_code(response)
             f.write(code)
             f.close()
             # self.verify_code("./LLM/gpt_code.py")
-            # self.code_python_version_correction("./LLM/gpt_code.py")
             try:
                 self.logger.info("running code...")
                 msg = String()

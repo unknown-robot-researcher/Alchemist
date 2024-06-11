@@ -8,7 +8,7 @@ import os, time
 import sys
 import rclpy
 from std_msgs.msg import String 
-from std_msgs.msg import Bool 
+from std_msgs.msg import Bool
 from UI.codeEditor.higlight import PythonHighlighter
 from PyQt5.QtWidgets import QWidget
 from threading import Thread
@@ -210,7 +210,7 @@ class startUpWindow(QMainWindow):
 		super(startUpWindow,self).__init__()
 		layout = QVBoxLayout()
 		self.combobox1 = QComboBox()
-		self.combobox1.addItems(['Panda', 'UR5', 'TIAGo','xArm7'])
+		self.combobox1.addItems(['xArm7','Panda', 'UR5', 'TIAGo'])
 		label1 = QLabel("Select Robot Platform")
 		self.combobox2 = QComboBox()
 		self.combobox2.addItems(['Low', 'High'])
@@ -254,9 +254,13 @@ class MainWindow(QMainWindow):
 
 		#GUI node
 		self.node = rclpy.create_node('GUI')
-		self.node.create_subscription(String, "/llm_response" ,self.store_llm_response,10)
-		self.node.create_subscription(String, "/run_gpt_code", self.store_run_gpt_code,10)
-		self.node.create_subscription(String, "/speech_text", self.store_user_speech,10)
+		self.resp_sub = self.node.create_subscription(String, "/llm_response" ,self.store_llm_response,1)
+
+		self.test_sub = self.node.create_subscription(String, "/test" ,self.test_topic,1)
+		
+		
+		self.run_sub = self.node.create_subscription(String, "/run_gpt_code", self.store_run_gpt_code,10)
+		self.sp2t_sub = self.node.create_subscription(String, "/speech_text", self.store_user_speech,10)
 		self.chatPublisher=self.node.create_publisher(String, "/llm_propmt",10)
 		self.robot_name_pub=self.node.create_publisher(String, "/start_llm",1)
 		self.abstraction_pub=self.node.create_publisher(String, "/abstraction",1)
@@ -799,8 +803,15 @@ class MainWindow(QMainWindow):
 
 	def store_llm_response(self,data):
 		new_response=data.data
+		print(new_response)
 		self.llm_responses.append(new_response)
 		self.updated=True
+
+	def test_topic(self,msg):
+		print(msg.data)
+
+	def test_service(self,msg):
+		print("service works")
 
 	def store_user_speech(self,data):
 		new_response=data.data
@@ -874,16 +885,20 @@ class MainWindow(QMainWindow):
 			self.update_title()
 
 def closing_llm():
-	p=rospy.Publisher("/llm_propmt", String, queue_size=10)
-	rospy.loginfo("shutting down the llm node...")
+	node = rclpy.create_node('llm_killer')
+	msg = String()
+	msg.data = "!quit"
+	p = node.create_publisher(String, "/llm_propmt",10)
 	time.sleep(1)
-	p.publish("!quit")
+	p.publish(msg)
 
 def closing_whisper():
-	pub=rospy.Publisher("/whisper", String, queue_size=10)
-	rospy.loginfo("shutting down the whisper node...")
+	node = rclpy.create_node('whisper_killer')
+	msg = String()
+	msg.data = "!quit"
+	p = node.create_publisher(String, "/whisper",10)
 	time.sleep(1)
-	pub.publish("!quit")
+	p.publish(msg)
 
 # drivers code
 #if __name__ == '__main__':
@@ -896,7 +911,7 @@ def Main():
 	app = QApplication(sys.argv)
 
 	# setting application name
-	app.setApplicationName("Natural Robot")
+	app.setApplicationName("Alchemist")
 	app.aboutToQuit.connect(closing_llm)
 	app.aboutToQuit.connect(closing_whisper)
 
